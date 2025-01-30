@@ -32,8 +32,8 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const [previewMask, setPreviewMask] = useState<Mask | null>(null)
   const [isEditing, setIsEditing] = useState(false)
 
-  const encoderSession = useOnnxSession('/models/mobilesam.encoder.onnx')
-  const decoderSession = useOnnxSession('/models/mobilesam.decoder.quant.onnx')
+  const encoderSession = useOnnxSession(`${import.meta.env.BASE_URL}/models/mobilesam.encoder.onnx`)
+  const decoderSession = useOnnxSession(`${import.meta.env.BASE_URL}/models/mobilesam.decoder.quant.onnx`))
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
 
