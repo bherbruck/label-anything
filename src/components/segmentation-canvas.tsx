@@ -107,14 +107,30 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
 
     // Draw preview mask if exists
     if (previewMask) {
-      const { color, pixels } = previewMask
-      context.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.5)`
-      pixels.forEach(({ x, y }) => {
-        // Scale points to canvas dimensions
-        const scaledX = (x / MODEL_WIDTH) * width
-        const scaledY = (y / MODEL_HEIGHT) * height
-        context.fillRect(scaledX, scaledY, 1, 1)
-      })
+      // Create temporary canvas for preview mask
+      const tempCanvas = document.createElement('canvas')
+      tempCanvas.width = MODEL_WIDTH
+      tempCanvas.height = MODEL_HEIGHT
+      const tempContext = tempCanvas.getContext('2d')
+      if (!tempContext) return
+
+      // Create preview mask data
+      const previewImageData = createColoredMaskImageData([previewMask], MODEL_WIDTH, MODEL_HEIGHT)
+      tempContext.putImageData(previewImageData, 0, 0)
+
+      // Draw preview mask with transparency
+      context.save()
+      context.globalAlpha = 0.5
+      context.drawImage(tempCanvas, 0, 0, width, height)
+      context.restore()
+
+      // Draw outline if in editing mode
+      if (isEditing) {
+        context.save()
+        context.globalAlpha = 1.0
+        drawOutlines(context, [previewMask], width, height)
+        context.restore()
+      }
     }
 
     // Draw selection highlight

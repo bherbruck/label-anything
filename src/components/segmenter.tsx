@@ -157,11 +157,12 @@ export const Segmenter: React.FC<SegmenterProps> = ({
 
       // Update preview mask
       if (maskPixels.length > 0) {
-        setPreviewMask({
+        setPreviewMask((prev) => ({
           id: -1, // Temporary ID
-          color: generateRandomColor(),
+          // Keep the same color if we already have a preview mask
+          color: prev?.color || generateRandomColor(),
           pixels: maskPixels,
-        })
+        }))
       } else {
         setPreviewMask(null)
       }
