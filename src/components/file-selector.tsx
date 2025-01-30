@@ -3,7 +3,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FolderOpen, Circle } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ScrollArea } from '@radix-ui/react-scroll-area'
 
 export interface FileEntry {
   handle: FileSystemFileHandle
@@ -30,8 +29,6 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
   const [files, setFiles] = useState<(FileEntry | null)[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isProcessingFiles, setIsProcessingFiles] = useState(false)
-  const [processedCount, setProcessedCount] = useState(0)
-  const [totalFiles, setTotalFiles] = useState(0)
 
   const parentRef = useRef<HTMLDivElement>(null)
   const fileEntriesRef = useRef<FileSystemFileHandle[]>([])
