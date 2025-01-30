@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { InferenceSession } from 'onnxruntime-web'
+import { InferenceSession } from 'onnxruntime-web/wasm'
 
 export const useOnnxSession = (uri: string, options?: InferenceSession.SessionOptions) => {
   const [session, setSession] = useState<InferenceSession | null>(null)
