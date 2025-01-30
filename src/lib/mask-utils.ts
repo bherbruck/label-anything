@@ -1,4 +1,4 @@
-import { type InferenceSession, Tensor } from 'onnxruntime-web'
+import { InferenceSession, Tensor } from 'onnxruntime-web'
 import { MODEL_WIDTH, MODEL_HEIGHT, MaskPixel, Point } from './types'
 
 export function getPixelSet(pixels: MaskPixel[]): Set<string> {
@@ -42,7 +42,7 @@ export function generateRandomColor(): [number, number, number] {
 }
 
 export async function generateMaskFromPoints(
-  decoderSession: InferenceSession,
+  inferenceSession: InferenceSession,
   imageEmbedding: Tensor,
   points: Point[],
   threshold = 0.5,
@@ -55,7 +55,8 @@ export async function generateMaskFromPoints(
   )
 
   try {
-    const results = await decoderSession.run({
+    console.log('Running inference', imageEmbedding, pointCoords, pointLabels)
+    const results = await inferenceSession.run({
       image_embeddings: imageEmbedding,
       point_coords: pointCoords,
       point_labels: pointLabels,

@@ -1,9 +1,9 @@
 import { tensor } from '@tensorflow/tfjs'
-import { type InferenceSession, Tensor } from 'onnxruntime-web'
+import { type InferenceSession, Tensor } from 'onnxruntime-web/webgpu'
 import { MODEL_HEIGHT, MODEL_WIDTH } from './types'
 
 export async function generateImageEmbedding(
-  encoderSession: InferenceSession,
+  inferenceSession: InferenceSession,
   fileData: File,
 ): Promise<Tensor | null> {
   try {
@@ -25,12 +25,14 @@ export async function generateImageEmbedding(
 
     imageDataTensor = new Tensor(tfTensor.dataSync() as Float32Array, tfTensor.shape)
 
-    const results = await encoderSession.run({
+    const results = await inferenceSession.run({
       input_image: imageDataTensor,
     })
 
     resizedTensor.dispose()
     tfTensor.dispose()
+
+    console.log('Embedding results:', results)
 
     return results.image_embeddings
   } catch (error) {

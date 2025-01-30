@@ -9,7 +9,7 @@ import { formatError } from '@/lib/utils'
 import SegmentationCanvas from './segmentation-canvas'
 import { Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import type { Tensor } from 'onnxruntime-web'
+import * as ortgpu from 'onnxruntime-web/webgpu'
 
 interface SegmenterProps {
   file: FileSystemFileHandle | null
@@ -31,7 +31,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   onMaskSelect,
 }) => {
   const [image, setImage] = useState<ImageBitmap | null>(null)
-  const [imageEmbedding, setImageEmbedding] = useState<Tensor | null>(null)
+  const [imageEmbedding, setImageEmbedding] = useState<ortgpu.Tensor | null>(null)
   const [dimensions, setDimensions] = useState<ImageSize | null>(null)
   const [isGeneratingEmbedding, setIsGeneratingEmbedding] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -49,7 +49,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
 
-  const encoderSession = useOnnxSession(encoderUrl)
   const decoderSession = useOnnxSession(decoderUrl)
 
   const { toast } = useToast()
@@ -61,7 +60,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
 
   useEffect(() => {
     const loadImage = async () => {
-      if (!file || !encoderSession || file === previousFileRef.current) return
+      if (!file || file === previousFileRef.current) return
 
       setIsLoading(true)
       try {
@@ -81,7 +80,10 @@ export const Segmenter: React.FC<SegmenterProps> = ({
 
         // Generate embedding
         setIsGeneratingEmbedding(true)
-        const embedding = await generateImageEmbedding(encoderSession, fileData)
+        const inferenceSession = await ortgpu.InferenceSession.create(encoderUrl, {
+          executionProviders: ['webgpu'],
+        })
+        const embedding = await generateImageEmbedding(inferenceSession, fileData)
         if (embedding) {
           setImageEmbedding(embedding)
         }
@@ -104,18 +106,10 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     return () => {
       previousFileRef.current = null
     }
-  }, [file, encoderSession])
+  }, [file])
 
   const handleCanvasClick = async (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (
-      !decoderSession ||
-      !imageEmbedding ||
-      !dimensions ||
-      !image ||
-      !file ||
-      isGeneratingEmbedding ||
-      isLoading
-    )
+    if (!imageEmbedding || !dimensions || !image || !file || isGeneratingEmbedding || isLoading)
       return
 
     const canvas = e.currentTarget
