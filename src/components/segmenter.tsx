@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { useOnnxSession } from '@/hooks/use-onnx-session'
+import { useUndoRedo } from '@/hooks/use-undo-redo'
 import * as ort from 'onnxruntime-web'
 import * as tf from '@tensorflow/tfjs'
 import { ImageSize, Mask, MaskPixel, MODEL_WIDTH, MODEL_HEIGHT, Point } from '@/lib/types'
@@ -32,7 +33,15 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const [dimensions, setDimensions] = useState<ImageSize | null>(null)
   const [isGeneratingEmbedding, setIsGeneratingEmbedding] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [currentPoints, setCurrentPoints] = useState<Point[]>([])
+  const {
+    state: currentPoints,
+    set: setCurrentPoints,
+    undo,
+    redo,
+    clear: clearPointHistory,
+    canUndo,
+    canRedo,
+  } = useUndoRedo<Point>([])
   const [previewMask, setPreviewMask] = useState<Mask | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -44,7 +53,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const { toast } = useToast()
 
   const clearCurrentPoints = () => {
-    setCurrentPoints([])
+    clearPointHistory()
     setPreviewMask(null)
   }
 
@@ -183,7 +192,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
       }
 
       onMaskSelect(null)
-
       setIsEditing(true)
     }
 
@@ -192,11 +200,10 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     const type = isShiftPressed ? 'negative' : 'positive'
 
     const newPoint: Point = { x, y, type }
-    const updatedPoints = [...currentPoints, newPoint]
-    setCurrentPoints(updatedPoints)
+    setCurrentPoints([...currentPoints, newPoint])
 
-    // Optionally, update preview mask
-    await handlePointsSend(updatedPoints)
+    // Update preview mask
+    await handlePointsSend([...currentPoints, newPoint])
   }
 
   const handlePointsSend = async (points: Point[]) => {
@@ -252,7 +259,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
       // Cleanup tensors
       pointCoords.dispose()
       pointLabels.dispose()
-      // ...existing tensor cleanup...
     } catch (error) {
       console.error('Error processing points:', error)
       toast({
@@ -273,21 +279,40 @@ export const Segmenter: React.FC<SegmenterProps> = ({
             color: previewMask.color,
             pixels: previewMask.pixels,
           })
-          setCurrentPoints([]) // Clear points after saving
-          setPreviewMask(null)
+          clearCurrentPoints()
         }
       } else if (e.key === 'Escape' && isEditing) {
         setIsEditing(false)
         clearCurrentPoints()
+      } else if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && isEditing) {
+        e.preventDefault()
+        if (canUndo) {
+          undo()
+        }
+      } else if (
+        (e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
+        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)
+      ) {
+        e.preventDefault()
+        if (canRedo) {
+          redo()
+        }
       }
     },
-    [currentPoints, isEditing, onMaskCreate, previewMask],
+    [currentPoints, isEditing, onMaskCreate, previewMask, canUndo, canRedo, undo, redo],
   )
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
+
+  // Update preview mask when points change due to undo/redo
+  useEffect(() => {
+    if (isEditing && currentPoints.length > 0) {
+      handlePointsSend(currentPoints)
+    }
+  }, [currentPoints])
 
   return (
     <Card
@@ -303,8 +328,8 @@ export const Segmenter: React.FC<SegmenterProps> = ({
             selectedMaskId={selectedMaskId}
             isEditing={isEditing}
             onCanvasClick={handleCanvasClick}
-            previewMask={previewMask} // Pass previewMask prop
-            points={currentPoints} // Pass points to canvas
+            previewMask={previewMask}
+            points={currentPoints}
           />
           {(isGeneratingEmbedding || isLoading) && (
             <div className="bg-background/50 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
