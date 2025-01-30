@@ -7,7 +7,13 @@ import { Toolbar } from '@/components/toolbar'
 import LabelManager from './components/label-manager'
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog'
 import type { Mask, Label } from '@/lib/types'
-import { isSavedMaskData, isSavedLabelData } from '@/lib/types'
+import {
+  loadLabelsFromDirectory,
+  saveLabelsToDirectory,
+  loadMasksFromFile,
+  saveMasksToFile,
+} from '@/lib/file-utils'
+import { formatError } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
 const App: React.FC = () => {
@@ -35,23 +41,13 @@ const App: React.FC = () => {
     if (!directoryHandle) return
 
     try {
-      const labelsHandle = await directoryHandle.getFileHandle('labels.json', {
-        create: true,
-      })
-      const fileData = await labelsHandle.getFile()
-      const data = await fileData.text()
-
-      if (data) {
-        const parsedData = JSON.parse(data)
-        if (isSavedLabelData(parsedData)) {
-          setLabels(parsedData.labels)
-        }
-      }
+      const loadedLabels = await loadLabelsFromDirectory(directoryHandle)
+      setLabels(loadedLabels)
     } catch (err) {
       console.error('Error loading labels:', err)
       toast({
         title: 'Error',
-        description: 'Failed to load labels',
+        description: formatError(err),
         variant: 'destructive',
       })
     }
@@ -62,17 +58,12 @@ const App: React.FC = () => {
     if (!directoryHandle) return
 
     try {
-      const labelsHandle = await directoryHandle.getFileHandle('labels.json', {
-        create: true,
-      })
-      const writable = await labelsHandle.createWritable()
-      await writable.write(JSON.stringify({ labels: labelsToSave }))
-      await writable.close()
+      await saveLabelsToDirectory(directoryHandle, labelsToSave)
     } catch (err) {
       console.error('Error saving labels:', err)
       toast({
         title: 'Error',
-        description: 'Failed to save labels',
+        description: formatError(err),
         variant: 'destructive',
       })
     }
@@ -85,24 +76,7 @@ const App: React.FC = () => {
     clearMaskState()
 
     try {
-      const maskFileHandle = await directoryHandle.getFileHandle(`${file.name}.masks.json`, {
-        create: false,
-      })
-      const fileData = await maskFileHandle.getFile()
-      const data = await fileData.text()
-      const parsedData = JSON.parse(data)
-
-      if (!isSavedMaskData(parsedData)) {
-        console.error('Invalid mask data format')
-        toast({
-          title: 'Error',
-          description: 'Invalid mask data format',
-          variant: 'destructive',
-        })
-        return
-      }
-
-      const { masks: savedMasks } = parsedData
+      const savedMasks = await loadMasksFromFile(directoryHandle, file.name)
 
       // Update nextMaskId to be higher than any existing mask ID
       const maxId = Math.max(...savedMasks.map((m) => m.id), 0)
@@ -215,17 +189,7 @@ const App: React.FC = () => {
     if (!selectedFile || !directoryHandle) return
 
     try {
-      const maskFileHandle = await directoryHandle.getFileHandle(
-        `${selectedFile.name}.masks.json`,
-        { create: true },
-      )
-      const writable = await maskFileHandle.createWritable()
-      await writable.write(
-        JSON.stringify({
-          masks,
-        }),
-      )
-      await writable.close()
+      await saveMasksToFile(directoryHandle, selectedFile.name, masks)
       setHasUnsavedChanges(false)
 
       // Update file list to show this file has masks
@@ -239,7 +203,7 @@ const App: React.FC = () => {
       console.error('Error saving masks:', err)
       toast({
         title: 'Error',
-        description: 'Failed to save masks',
+        description: formatError(err),
         variant: 'destructive',
       })
     }
@@ -288,7 +252,7 @@ const App: React.FC = () => {
             masks={masks}
             selectedMaskId={selectedMaskId}
             onMaskSelect={setSelectedMaskId}
-            selectedLabelId={selectedLabelId} // Ensure this prop is a string
+            selectedLabelId={selectedLabelId}
           />
 
           <div className="flex flex-none flex-col gap-4">

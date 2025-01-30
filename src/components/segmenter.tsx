@@ -2,12 +2,14 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { useOnnxSession } from '@/hooks/use-onnx-session'
 import { useUndoRedo } from '@/hooks/use-undo-redo'
-import * as ort from 'onnxruntime-web'
-import * as tf from '@tensorflow/tfjs'
-import { ImageSize, Mask, MaskPixel, MODEL_WIDTH, MODEL_HEIGHT, Point } from '@/lib/types'
+import { ImageSize, Mask, MODEL_WIDTH, MODEL_HEIGHT, Point } from '@/lib/types'
+import { calculateImageDimensions, generateImageEmbedding } from '@/lib/image-utils'
+import { generateMaskFromPoints, generateRandomColor } from '@/lib/mask-utils'
+import { formatError } from '@/lib/utils'
 import SegmentationCanvas from './segmentation-canvas'
 import { Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import type { Tensor } from 'onnxruntime-web'
 
 interface SegmenterProps {
   file: FileSystemFileHandle | null
@@ -29,7 +31,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   onMaskSelect,
 }) => {
   const [image, setImage] = useState<ImageBitmap | null>(null)
-  const [imageEmbedding, setImageEmbedding] = useState<ort.Tensor | null>(null)
+  const [imageEmbedding, setImageEmbedding] = useState<Tensor | null>(null)
   const [dimensions, setDimensions] = useState<ImageSize | null>(null)
   const [isGeneratingEmbedding, setIsGeneratingEmbedding] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -57,71 +59,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     setPreviewMask(null)
   }
 
-  const calculateDimensions = (imageWidth: number, imageHeight: number): ImageSize | null => {
-    if (!containerRef.current) return null
-
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const containerWidth = containerRect.width
-    const containerHeight = containerRect.height
-
-    const aspectRatio = imageWidth / imageHeight
-    let finalWidth = containerWidth
-    let finalHeight = containerWidth / aspectRatio
-
-    if (finalHeight > containerHeight) {
-      finalHeight = containerHeight
-      finalWidth = containerHeight * aspectRatio
-    }
-
-    return {
-      width: Math.floor(finalWidth),
-      height: Math.floor(finalHeight),
-    }
-  }
-
-  const generateEmbedding = async (fileData: File): Promise<ort.Tensor | null> => {
-    if (!encoderSession) return null
-
-    try {
-      const inputImage = await createImageBitmap(fileData, {
-        resizeWidth: MODEL_WIDTH,
-        resizeHeight: MODEL_HEIGHT,
-      })
-      const resizedTensor = await ort.Tensor.fromImage(inputImage, {
-        resizedWidth: MODEL_WIDTH,
-        resizedHeight: MODEL_HEIGHT,
-      })
-      const resizeImage = resizedTensor.toImageData()
-      let imageDataTensor = await ort.Tensor.fromImage(resizeImage)
-      const tfTensor = tf
-        .tensor(imageDataTensor.data, imageDataTensor.dims as [number, number, number])
-        .reshape([3, MODEL_HEIGHT, MODEL_WIDTH])
-        .transpose([1, 2, 0])
-        .mul(255)
-
-      // @ts-expect-error
-      imageDataTensor = new ort.Tensor(tfTensor.dataSync(), tfTensor.shape)
-
-      ort.env.wasm.numThreads = 1
-      const results = await encoderSession.run({
-        input_image: imageDataTensor,
-      })
-
-      resizedTensor.dispose()
-      tfTensor.dispose()
-
-      return results.image_embeddings
-    } catch (error) {
-      console.error('Error generating embedding:', error)
-      toast({
-        title: 'Error',
-        description: 'Error generating embedding',
-        variant: 'destructive',
-      })
-      return null
-    }
-  }
-
   useEffect(() => {
     const loadImage = async () => {
       if (!file || !encoderSession || file === previousFileRef.current) return
@@ -132,13 +69,19 @@ export const Segmenter: React.FC<SegmenterProps> = ({
         const loadedImage = await createImageBitmap(fileData)
         setImage(loadedImage)
 
-        const dims = calculateDimensions(loadedImage.width, loadedImage.height)
-        if (!dims) return
+        if (!containerRef.current) return
+        const containerRect = containerRef.current.getBoundingClientRect()
+        const dims = calculateImageDimensions(
+          loadedImage.width,
+          loadedImage.height,
+          containerRect.width,
+          containerRect.height,
+        )
         setDimensions(dims)
 
         // Generate embedding
         setIsGeneratingEmbedding(true)
-        const embedding = await generateEmbedding(fileData)
+        const embedding = await generateImageEmbedding(encoderSession, fileData)
         if (embedding) {
           setImageEmbedding(embedding)
         }
@@ -146,7 +89,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
         console.error('Error loading image:', error)
         toast({
           title: 'Error',
-          description: 'Error loading image',
+          description: formatError(error),
           variant: 'destructive',
         })
       } finally {
@@ -210,60 +153,23 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     if (!decoderSession || !imageEmbedding || !dimensions || !image || !file) return
 
     try {
-      const flatCoords = points.flatMap((point) => [point.x, point.y])
-      const pointCoords = new ort.Tensor(new Float32Array([...flatCoords]), [1, points.length, 2])
-      const pointLabels = new ort.Tensor(
-        new Float32Array([...points.map((point) => (point.type === 'positive' ? 1 : 0))]),
-        [1, points.length],
-      )
-
-      const results = await decoderSession.run({
-        image_embeddings: imageEmbedding,
-        point_coords: pointCoords,
-        point_labels: pointLabels,
-        mask_input: new ort.Tensor(new Float32Array(256 * 256), [1, 1, 256, 256]),
-        has_mask_input: new ort.Tensor(new Float32Array([0]), [1]),
-        orig_im_size: new ort.Tensor(new Float32Array([MODEL_HEIGHT, MODEL_WIDTH]), [2]),
-      })
-
-      const maskImageData = results.masks.toImageData()
-      const threshold = 0.5
-      const data = maskImageData.data
-      const maskPixels: MaskPixel[] = []
-
-      // Convert binary mask to pixel coordinates
-      for (let i = 0; i < MODEL_WIDTH * MODEL_HEIGHT; i++) {
-        if (data[i * 4] / 255 > threshold) {
-          maskPixels.push({
-            x: i % MODEL_WIDTH,
-            y: Math.floor(i / MODEL_WIDTH),
-          })
-        }
-      }
+      const maskPixels = await generateMaskFromPoints(decoderSession, imageEmbedding, points)
 
       // Update preview mask
       if (maskPixels.length > 0) {
         setPreviewMask({
           id: -1, // Temporary ID
-          color: [
-            Math.floor(Math.random() * 256),
-            Math.floor(Math.random() * 256),
-            Math.floor(Math.random() * 256),
-          ],
+          color: generateRandomColor(),
           pixels: maskPixels,
         })
       } else {
         setPreviewMask(null)
       }
-
-      // Cleanup tensors
-      pointCoords.dispose()
-      pointLabels.dispose()
     } catch (error) {
       console.error('Error processing points:', error)
       toast({
         title: 'Error',
-        description: 'Error processing points',
+        description: formatError(error),
         variant: 'destructive',
       })
     }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { ImageSize, Mask, MODEL_WIDTH, MODEL_HEIGHT, Point } from '@/lib/types'
+import { getBoundaryPixels } from '@/lib/mask-utils'
 
 interface SegmentationCanvasProps {
   image: ImageBitmap | null
@@ -44,41 +45,6 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
     return imageData
   }
 
-  // Function to create a set of pixels for quick lookup
-  const getPixelSet = (pixels: Mask['pixels']) => {
-    const pixelSet = new Set<string>()
-    pixels.forEach(({ x, y }) => {
-      pixelSet.add(`${x},${y}`)
-    })
-    return pixelSet
-  }
-
-  // Function to compute boundary pixels of a mask
-  const getBoundaryPixels = (mask: Mask): Point[] => {
-    const pixelSet = getPixelSet(mask.pixels)
-    const boundary: Point[] = []
-    const directions = [
-      { dx: -1, dy: 0 },
-      { dx: 1, dy: 0 },
-      { dx: 0, dy: -1 },
-      { dx: 0, dy: 1 },
-    ]
-
-    mask.pixels.forEach(({ x, y }) => {
-      for (const { dx, dy } of directions) {
-        const nx = x + dx
-        const ny = y + dy
-        // If neighbor is not in the mask, current pixel is a boundary
-        if (!pixelSet.has(`${nx},${ny}`)) {
-          boundary.push({ x, y } as Point)
-          break
-        }
-      }
-    })
-
-    return boundary
-  }
-
   // Function to draw outlines around masks
   const drawOutlines = (
     context: CanvasRenderingContext2D,
@@ -87,12 +53,11 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
     height: number,
   ) => {
     masks.forEach((mask) => {
-      const boundaryPixels = getBoundaryPixels(mask)
-      context.fillStyle = 'black' // Outline color (you can customize this)
+      const boundaryPixels = getBoundaryPixels(mask.pixels)
+      context.fillStyle = 'black' // Outline color
       boundaryPixels.forEach(({ x, y }) => {
         const scaledX = (x / MODEL_WIDTH) * width
         const scaledY = (y / MODEL_HEIGHT) * height
-        // Draw a small rectangle for each boundary pixel to form the outline
         context.fillRect(scaledX, scaledY, 1, 1)
       })
     })
@@ -190,7 +155,7 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
       context.fillStyle = point.type === 'positive' ? 'green' : 'red'
       context.fill()
     })
-  }, [image, dimensions, masks, selectedMaskId, previewMask, points]) // Add points to dependencies
+  }, [image, dimensions, masks, selectedMaskId, previewMask, points])
 
   // Handle mouse movement
   const handleMouseMove = useCallback(
@@ -210,7 +175,7 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
         canvasRef.current.style.cursor = isOverMask ? 'pointer' : 'crosshair'
       }
     },
-    [masks, dimensions],
+    [masks, dimensions, isEditing],
   )
 
   useEffect(() => {
