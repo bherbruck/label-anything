@@ -8,6 +8,7 @@ import LabelManager from './components/label-manager'
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog'
 import type { Mask, Label } from '@/lib/types'
 import { isSavedMaskData, isSavedLabelData } from '@/lib/types'
+import { useToast } from '@/hooks/use-toast'
 
 const App: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<FileEntry | null>(null)
@@ -20,6 +21,7 @@ const App: React.FC = () => {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const nextMaskId = useRef(1)
   const pendingFileSelection = useRef<FileEntry | null>(null)
+  const { toast } = useToast()
 
   const clearMaskState = () => {
     setMasks([])
@@ -47,6 +49,11 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error('Error loading labels:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to load labels',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -63,6 +70,11 @@ const App: React.FC = () => {
       await writable.close()
     } catch (err) {
       console.error('Error saving labels:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to save labels',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -82,6 +94,11 @@ const App: React.FC = () => {
 
       if (!isSavedMaskData(parsedData)) {
         console.error('Invalid mask data format')
+        toast({
+          title: 'Error',
+          description: 'Invalid mask data format',
+          variant: 'destructive',
+        })
         return
       }
 
@@ -213,8 +230,18 @@ const App: React.FC = () => {
 
       // Update file list to show this file has masks
       selectedFile.hasMasks = true
+
+      toast({
+        title: 'Saved',
+        description: 'Masks saved successfully',
+      })
     } catch (err) {
       console.error('Error saving masks:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to save masks',
+        variant: 'destructive',
+      })
     }
   }, [selectedFile, masks, directoryHandle])
 

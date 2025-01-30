@@ -6,6 +6,7 @@ import * as tf from '@tensorflow/tfjs'
 import { ImageSize, Mask, MaskPixel, MODEL_WIDTH, MODEL_HEIGHT, Point } from '@/lib/types'
 import SegmentationCanvas from './segmentation-canvas'
 import { Loader2 } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 interface SegmenterProps {
   file: FileSystemFileHandle | null
@@ -39,6 +40,8 @@ export const Segmenter: React.FC<SegmenterProps> = ({
 
   const encoderSession = useOnnxSession(encoderUrl)
   const decoderSession = useOnnxSession(decoderUrl)
+
+  const { toast } = useToast()
 
   const clearCurrentPoints = () => {
     setCurrentPoints([])
@@ -101,6 +104,11 @@ export const Segmenter: React.FC<SegmenterProps> = ({
       return results.image_embeddings
     } catch (error) {
       console.error('Error generating embedding:', error)
+      toast({
+        title: 'Error',
+        description: 'Error generating embedding',
+        variant: 'destructive',
+      })
       return null
     }
   }
@@ -127,6 +135,11 @@ export const Segmenter: React.FC<SegmenterProps> = ({
         }
       } catch (error) {
         console.error('Error loading image:', error)
+        toast({
+          title: 'Error',
+          description: 'Error loading image',
+          variant: 'destructive',
+        })
       } finally {
         setIsGeneratingEmbedding(false)
         setIsLoading(false)
@@ -242,6 +255,11 @@ export const Segmenter: React.FC<SegmenterProps> = ({
       // ...existing tensor cleanup...
     } catch (error) {
       console.error('Error processing points:', error)
+      toast({
+        title: 'Error',
+        description: 'Error processing points',
+        variant: 'destructive',
+      })
     }
   }
 

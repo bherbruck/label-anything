@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 
 export interface FileEntry {
   handle: FileSystemFileHandle
@@ -47,6 +48,8 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
   const fileEntriesRef = useRef<FileSystemFileHandle[]>([])
   const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
   const processingChunksRef = useRef<Set<number>>(new Set())
+
+  const { toast } = useToast()
 
   const rowVirtualizer = useVirtualizer({
     count: files.length,
@@ -166,6 +169,12 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
       await processFileChunk(0, 20)
     } catch (err) {
       console.error('Error accessing directory:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to access directory',
+        variant: 'destructive',
+      })
+      toast
     } finally {
       setIsLoading(false)
     }
