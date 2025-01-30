@@ -139,11 +139,9 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
       // Sort entries by name
       imageEntries.sort((a, b) => a.name.localeCompare(b.name))
       fileEntriesRef.current = imageEntries
-      setTotalFiles(imageEntries.length)
 
       // Create placeholder entries
       setFiles(new Array(imageEntries.length).fill(null))
-      setProcessedCount(0)
       setIsProcessingFiles(true)
 
       // Process first chunk immediately
