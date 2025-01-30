@@ -81,8 +81,6 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
           thumbnail,
           hasMasks,
         })
-
-        setProcessedCount((prev) => prev + 1)
       } catch (error) {
         console.error(`Error processing file ${entry.name}:`, error)
         processedEntries.push(null)
