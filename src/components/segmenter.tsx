@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
-import { useOnnxSession } from '@/hooks/use-onnx-session'
 import * as ort from 'onnxruntime-web'
 import * as tf from '@tensorflow/tfjs'
 import { ImageSize, Mask, MaskPixel, MODEL_WIDTH, MODEL_HEIGHT, Point } from '@/lib/types'
+import { useOnnxSession } from '@/hooks/use-onnx-session'
 import SegmentationCanvas from './segmentation-canvas'
 import { Loader2 } from 'lucide-react'
+import { clear } from 'console'
 
 interface SegmenterProps {
   file: FileSystemFileHandle | null
@@ -16,6 +17,18 @@ interface SegmenterProps {
   selectedLabelId: string | null
 }
 
+const useSegmenterSessions = () => {
+  const encoder = useOnnxSession('../assets/models/mobilesam.encoder.onnx')
+  const decoder = useOnnxSession('../assets/models/mobilesam.decoder.quant.onnx')
+
+  return {
+    encoderSession: encoder.session,
+    decoderSession: decoder.session,
+    isLoading: encoder.isLoading || decoder.isLoading,
+    error: encoder.error || decoder.error,
+  }
+}
+
 export const Segmenter: React.FC<SegmenterProps> = ({
   file,
   onMaskCreate,
@@ -23,6 +36,12 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   selectedMaskId,
   onMaskSelect,
 }) => {
+  const {
+    encoderSession,
+    decoderSession,
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useSegmenterSessions()
   const [image, setImage] = useState<ImageBitmap | null>(null)
   const [imageEmbedding, setImageEmbedding] = useState<ort.Tensor | null>(null)
   const [dimensions, setDimensions] = useState<ImageSize | null>(null)
@@ -31,9 +50,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const [currentPoints, setCurrentPoints] = useState<Point[]>([])
   const [previewMask, setPreviewMask] = useState<Mask | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-
-  const encoderSession = useOnnxSession('/models/mobilesam.encoder.onnx')
-  const decoderSession = useOnnxSession('/models/mobilesam.decoder.quant.onnx')
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
 
@@ -103,6 +119,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   }
 
   useEffect(() => {
+    clearCurrentPoints()
     const loadImage = async () => {
       if (!file || !encoderSession || file === previousFileRef.current) return
 
@@ -116,7 +133,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
         if (!dims) return
         setDimensions(dims)
 
-        // Generate embedding
         setIsGeneratingEmbedding(true)
         const embedding = await generateEmbedding(fileData)
         if (embedding) {
@@ -159,7 +175,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     const y = Math.floor(percentY * MODEL_HEIGHT)
 
     if (!isEditing) {
-      // Handle mask selection when not in edit mode
       const clickedMasks = masks.filter((mask) => mask.pixels.some((p) => p.x === x && p.y === y))
       if (clickedMasks.length > 0) {
         onMaskSelect(clickedMasks[0].id)
@@ -167,11 +182,9 @@ export const Segmenter: React.FC<SegmenterProps> = ({
       }
 
       onMaskSelect(null)
-
       setIsEditing(true)
     }
 
-    // Handle adding points when in edit mode
     const isShiftPressed = e.shiftKey
     const type = isShiftPressed ? 'negative' : 'positive'
 
@@ -179,7 +192,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     const updatedPoints = [...currentPoints, newPoint]
     setCurrentPoints(updatedPoints)
 
-    // Optionally, update preview mask
     await handlePointsSend(updatedPoints)
   }
 
@@ -212,7 +224,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
       const data = maskImageData.data
       const maskPixels: MaskPixel[] = []
 
-      // Convert binary mask to pixel coordinates
       for (let i = 0; i < MODEL_WIDTH * MODEL_HEIGHT; i++) {
         if (data[i * 4] / 255 > threshold) {
           maskPixels.push({
@@ -222,10 +233,9 @@ export const Segmenter: React.FC<SegmenterProps> = ({
         }
       }
 
-      // Update preview mask
       if (maskPixels.length > 0) {
         setPreviewMask({
-          id: -1, // Temporary ID
+          id: -1,
           color: [
             Math.floor(Math.random() * 256),
             Math.floor(Math.random() * 256),
@@ -237,10 +247,8 @@ export const Segmenter: React.FC<SegmenterProps> = ({
         setPreviewMask(null)
       }
 
-      // Cleanup tensors
       pointCoords.dispose()
       pointLabels.dispose()
-      // ...existing tensor cleanup...
     } catch (error) {
       console.error('Error processing points:', error)
     }
@@ -252,11 +260,11 @@ export const Segmenter: React.FC<SegmenterProps> = ({
         setIsEditing(false)
         if (currentPoints.length > 0 && previewMask) {
           onMaskCreate({
-            id: -1, // Will be assigned by App
+            id: -1,
             color: previewMask.color,
             pixels: previewMask.pixels,
           })
-          setCurrentPoints([]) // Clear points after saving
+          setCurrentPoints([])
           setPreviewMask(null)
         }
       } else if (e.key === 'Escape' && isEditing) {
@@ -277,7 +285,9 @@ export const Segmenter: React.FC<SegmenterProps> = ({
       ref={containerRef}
       className="relative flex h-full w-full flex-1 items-center justify-center overflow-hidden"
     >
-      {image ? (
+      {modelsError ? (
+        <p className="text-destructive text-sm">Error loading models: {modelsError.message}</p>
+      ) : image ? (
         <>
           <SegmentationCanvas
             image={image}
@@ -286,20 +296,20 @@ export const Segmenter: React.FC<SegmenterProps> = ({
             selectedMaskId={selectedMaskId}
             isEditing={isEditing}
             onCanvasClick={handleCanvasClick}
-            previewMask={previewMask} // Pass previewMask prop
-            points={currentPoints} // Pass points to canvas
+            previewMask={previewMask}
+            points={currentPoints}
           />
-          {(isGeneratingEmbedding || isLoading) && (
+          {(isGeneratingEmbedding || isLoading || modelsLoading) && (
             <div className="bg-background/50 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
               <div className="bg-background flex flex-col items-center gap-2 rounded-lg p-4 shadow-lg">
-                {isGeneratingEmbedding || isLoading ? (
-                  <>
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="text-sm">
-                      {isGeneratingEmbedding ? 'Generating embedding...' : 'Loading image...'}
-                    </span>
-                  </>
-                ) : null}
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="text-sm">
+                  {modelsLoading
+                    ? 'Loading models...'
+                    : isGeneratingEmbedding
+                      ? 'Generating embedding...'
+                      : 'Loading image...'}
+                </span>
               </div>
             </div>
           )}
