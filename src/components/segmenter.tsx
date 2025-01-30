@@ -16,6 +16,9 @@ interface SegmenterProps {
   selectedLabelId: string | null
 }
 
+const encoderUrl = `${import.meta.env.BASE_URL}/models/mobilesam.encoder.onnx`
+const decoderUrl = `${import.meta.env.BASE_URL}/models/mobilesam.decoder.quant.onnx`
+
 export const Segmenter: React.FC<SegmenterProps> = ({
   file,
   onMaskCreate,
@@ -31,11 +34,11 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const [currentPoints, setCurrentPoints] = useState<Point[]>([])
   const [previewMask, setPreviewMask] = useState<Mask | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-
-  const encoderSession = useOnnxSession(`${import.meta.env.BASE_URL}/models/mobilesam.encoder.onnx`)
-  const decoderSession = useOnnxSession(`${import.meta.env.BASE_URL}/models/mobilesam.decoder.quant.onnx`))
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
+
+  const encoderSession = useOnnxSession(encoderUrl)
+  const decoderSession = useOnnxSession(decoderUrl)
 
   const clearCurrentPoints = () => {
     setCurrentPoints([])
