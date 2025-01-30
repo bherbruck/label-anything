@@ -218,16 +218,22 @@ const App: React.FC = () => {
     }
   }, [selectedFile, masks, directoryHandle])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
       if (e.key === 'Delete' && selectedMaskId !== null) {
         handleMaskRemove(selectedMaskId)
+      } else if (e.key === 's' && e.ctrlKey) {
+        e.preventDefault()
+        handleSaveMasks()
       }
-    }
+    },
+    [selectedMaskId, handleMaskRemove, handleSaveMasks],
+  )
 
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedMaskId])
+  }, [handleKeyDown])
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
