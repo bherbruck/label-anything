@@ -1,4 +1,4 @@
-import * as ort from 'onnxruntime-web'
+import { type InferenceSession, Tensor } from 'onnxruntime-web'
 import { MODEL_WIDTH, MODEL_HEIGHT, MaskPixel, Point } from './types'
 
 export function getPixelSet(pixels: MaskPixel[]): Set<string> {
@@ -42,14 +42,14 @@ export function generateRandomColor(): [number, number, number] {
 }
 
 export async function generateMaskFromPoints(
-  decoderSession: ort.InferenceSession,
-  imageEmbedding: ort.Tensor,
+  decoderSession: InferenceSession,
+  imageEmbedding: Tensor,
   points: Point[],
   threshold = 0.5,
 ): Promise<MaskPixel[]> {
   const flatCoords = points.flatMap((point) => [point.x, point.y])
-  const pointCoords = new ort.Tensor(new Float32Array([...flatCoords]), [1, points.length, 2])
-  const pointLabels = new ort.Tensor(
+  const pointCoords = new Tensor(new Float32Array([...flatCoords]), [1, points.length, 2])
+  const pointLabels = new Tensor(
     new Float32Array([...points.map((point) => (point.type === 'positive' ? 1 : 0))]),
     [1, points.length],
   )
@@ -59,9 +59,9 @@ export async function generateMaskFromPoints(
       image_embeddings: imageEmbedding,
       point_coords: pointCoords,
       point_labels: pointLabels,
-      mask_input: new ort.Tensor(new Float32Array(256 * 256), [1, 1, 256, 256]),
-      has_mask_input: new ort.Tensor(new Float32Array([0]), [1]),
-      orig_im_size: new ort.Tensor(new Float32Array([MODEL_HEIGHT, MODEL_WIDTH]), [2]),
+      mask_input: new Tensor(new Float32Array(256 * 256), [1, 1, 256, 256]),
+      has_mask_input: new Tensor(new Float32Array([0]), [1]),
+      orig_im_size: new Tensor(new Float32Array([MODEL_HEIGHT, MODEL_WIDTH]), [2]),
     })
 
     const maskImageData = results.masks.toImageData()
