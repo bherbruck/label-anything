@@ -191,14 +191,10 @@ export const Segmenter: React.FC<SegmenterProps> = ({
 
     try {
       const flatCoords = points.flatMap((point) => [point.x, point.y])
-      const pointCoords = new ort.Tensor(new Float32Array([...flatCoords, 0, 0]), [
-        1,
-        points.length + 1,
-        2,
-      ])
+      const pointCoords = new ort.Tensor(new Float32Array([...flatCoords]), [1, points.length, 2])
       const pointLabels = new ort.Tensor(
-        new Float32Array([...points.map((point) => (point.type === 'positive' ? 1 : 0)), -1]),
-        [1, points.length + 1],
+        new Float32Array([...points.map((point) => (point.type === 'positive' ? 1 : 0))]),
+        [1, points.length],
       )
 
       const results = await decoderSession.run({
