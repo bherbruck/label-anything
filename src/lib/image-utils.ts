@@ -1,4 +1,4 @@
-import { tensor as createTensor } from '@tensorflow/tfjs'
+import { tensor } from '@tensorflow/tfjs'
 import { type InferenceSession, Tensor } from 'onnxruntime-web'
 import { MODEL_HEIGHT, MODEL_WIDTH } from './types'
 
@@ -17,16 +17,13 @@ export async function generateImageEmbedding(
     })
     const resizeImage = resizedTensor.toImageData()
     let imageDataTensor = await Tensor.fromImage(resizeImage)
-    const tfTensor = createTensor(
-      imageDataTensor.data,
-      imageDataTensor.dims as [number, number, number],
-    )
+
+    const tfTensor = tensor(imageDataTensor.data, imageDataTensor.dims as [number, number, number])
       .reshape([3, MODEL_HEIGHT, MODEL_WIDTH])
       .transpose([1, 2, 0])
       .mul(255)
 
-    // @ts-expect-error
-    imageDataTensor = new Tensor(tfTensor.dataSync(), tfTensor.shape)
+    imageDataTensor = new Tensor(tfTensor.dataSync() as Float32Array, tfTensor.shape)
 
     const results = await encoderSession.run({
       input_image: imageDataTensor,
