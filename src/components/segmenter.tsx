@@ -16,18 +16,6 @@ interface SegmenterProps {
   selectedLabelId: string | null
 }
 
-const joinPaths = (...parts: string[]) => {
-  return parts
-    .map((part) => part.replace(/^\/+|\/+$/g, '')) // Remove leading/trailing slashes
-    .filter((part) => part.length > 0) // Remove empty parts
-    .join('/')
-}
-
-// Then use it with the base URL:
-const getModelPath = (path: string) => {
-  return joinPaths(import.meta.env.BASE_URL, path)
-}
-
 export const Segmenter: React.FC<SegmenterProps> = ({
   file,
   onMaskCreate,
@@ -44,8 +32,8 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const [previewMask, setPreviewMask] = useState<Mask | null>(null)
   const [isEditing, setIsEditing] = useState(false)
 
-  const encoderSession = useOnnxSession(getModelPath('/models/mobilesam.encoder.onnx'))
-  const decoderSession = useOnnxSession(getModelPath('/models/mobilesam.decoder.quant.onnx'))
+  const encoderSession = useOnnxSession('/models/mobilesam.encoder.onnx')
+  const decoderSession = useOnnxSession('/models/mobilesam.decoder.quant.onnx')
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
 
