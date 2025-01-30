@@ -16,8 +16,8 @@ interface SegmenterProps {
   selectedLabelId: string | null
 }
 
-const encoderUrl = `${import.meta.env.BASE_URL}/models/mobilesam.encoder.onnx`
-const decoderUrl = `${import.meta.env.BASE_URL}/models/mobilesam.decoder.quant.onnx`
+const encoderUrl = `${import.meta.env.BASE_URL}models/mobilesam.encoder.onnx`
+const decoderUrl = `${import.meta.env.BASE_URL}models/mobilesam.decoder.quant.onnx`
 
 export const Segmenter: React.FC<SegmenterProps> = ({
   file,
@@ -36,6 +36,8 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const [isEditing, setIsEditing] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
+
+  console.log(encoderUrl, decoderUrl)
 
   const encoderSession = useOnnxSession(encoderUrl)
   const decoderSession = useOnnxSession(decoderUrl)
