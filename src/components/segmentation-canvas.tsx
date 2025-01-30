@@ -44,6 +44,60 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
     return imageData
   }
 
+  // Function to create a set of pixels for quick lookup
+  const getPixelSet = (pixels: Mask['pixels']) => {
+    const pixelSet = new Set<string>()
+    pixels.forEach(({ x, y }) => {
+      pixelSet.add(`${x},${y}`)
+    })
+    return pixelSet
+  }
+
+  // Function to compute boundary pixels of a mask
+  const getBoundaryPixels = (mask: Mask): Point[] => {
+    const pixelSet = getPixelSet(mask.pixels)
+    const boundary: Point[] = []
+    const directions = [
+      { dx: -1, dy: 0 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: -1 },
+      { dx: 0, dy: 1 },
+    ]
+
+    mask.pixels.forEach(({ x, y }) => {
+      for (const { dx, dy } of directions) {
+        const nx = x + dx
+        const ny = y + dy
+        // If neighbor is not in the mask, current pixel is a boundary
+        if (!pixelSet.has(`${nx},${ny}`)) {
+          boundary.push({ x, y } as Point)
+          break
+        }
+      }
+    })
+
+    return boundary
+  }
+
+  // Function to draw outlines around masks
+  const drawOutlines = (
+    context: CanvasRenderingContext2D,
+    masks: Mask[],
+    width: number,
+    height: number,
+  ) => {
+    masks.forEach((mask) => {
+      const boundaryPixels = getBoundaryPixels(mask)
+      context.fillStyle = 'black' // Outline color (you can customize this)
+      boundaryPixels.forEach(({ x, y }) => {
+        const scaledX = (x / MODEL_WIDTH) * width
+        const scaledY = (y / MODEL_HEIGHT) * height
+        // Draw a small rectangle for each boundary pixel to form the outline
+        context.fillRect(scaledX, scaledY, 1, 1)
+      })
+    })
+  }
+
   // Draw canvas content
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -78,6 +132,12 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
       context.globalAlpha = 0.5
       context.drawImage(tempCanvas, 0, 0, width, height)
       context.restore()
+
+      // Draw outlines on top of masks
+      context.save()
+      context.globalAlpha = 1.0 // Ensure outlines are fully opaque
+      drawOutlines(context, masks, width, height)
+      context.restore()
     }
 
     // Draw preview mask if exists
@@ -102,10 +162,10 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
         // Find bounds of selected mask
         const pixels = selectedMask.pixels
         if (pixels.length > 0) {
-          const minX = pixels.reduce((min, p) => p.x < min ? p.x : min, Infinity)
-          const minY = pixels.reduce((min, p) => p.y < min ? p.y : min, Infinity)
-          const maxX = pixels.reduce((max, p) => p.x > max ? p.x : max, -Infinity)
-          const maxY = pixels.reduce((max, p) => p.y > max ? p.y : max, -Infinity)
+          const minX = pixels.reduce((min, p) => (p.x < min ? p.x : min), Infinity)
+          const minY = pixels.reduce((min, p) => (p.y < min ? p.y : min), Infinity)
+          const maxX = pixels.reduce((max, p) => (p.x > max ? p.x : max), -Infinity)
+          const maxY = pixels.reduce((max, p) => (p.y > max ? p.y : max), -Infinity)
 
           // Scale to canvas dimensions
           const scaleX = width / MODEL_WIDTH
