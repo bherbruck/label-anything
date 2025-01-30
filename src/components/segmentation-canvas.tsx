@@ -24,6 +24,7 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
   isEditing = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Create ImageData for rendering masks
   const createColoredMaskImageData = (masks: Mask[], width: number, height: number): ImageData => {
@@ -63,13 +64,42 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
     })
   }
 
+  const updateCanvasSize = useCallback(() => {
+    if (!canvasRef.current || !containerRef.current || !image) return
+
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const containerWidth = containerRect.width
+    const containerHeight = containerRect.height
+
+    // Calculate the scaling factors for width and height
+    const scaleWidth = containerWidth / image.width
+    const scaleHeight = containerHeight / image.height
+
+    // Use the smaller scale to ensure the image fits both dimensions
+    const scale = Math.min(scaleWidth, scaleHeight)
+
+    // Calculate the final dimensions
+    const width = Math.floor(image.width * scale)
+    const height = Math.floor(image.height * scale)
+
+    // Update dimensions state if needed
+    if (dimensions?.width !== width || dimensions?.height !== height) {
+      dimensions = { width, height }
+    }
+
+    return { width, height }
+  }, [image, dimensions])
+
   // Draw canvas content
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current
     const context = canvas?.getContext('2d')
-    if (!canvas || !context || !image || !dimensions) return
+    if (!canvas || !context || !image) return
 
-    const { width, height } = dimensions
+    const newDimensions = updateCanvasSize()
+    if (!newDimensions) return
+
+    const { width, height } = newDimensions
 
     // Set canvas size
     canvas.width = width
@@ -100,31 +130,27 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
 
       // Draw outlines on top of masks
       context.save()
-      context.globalAlpha = 1.0 // Ensure outlines are fully opaque
+      context.globalAlpha = 1.0
       drawOutlines(context, masks, width, height)
       context.restore()
     }
 
     // Draw preview mask if exists
     if (previewMask) {
-      // Create temporary canvas for preview mask
       const tempCanvas = document.createElement('canvas')
       tempCanvas.width = MODEL_WIDTH
       tempCanvas.height = MODEL_HEIGHT
       const tempContext = tempCanvas.getContext('2d')
       if (!tempContext) return
 
-      // Create preview mask data
       const previewImageData = createColoredMaskImageData([previewMask], MODEL_WIDTH, MODEL_HEIGHT)
       tempContext.putImageData(previewImageData, 0, 0)
 
-      // Draw preview mask with transparency
       context.save()
       context.globalAlpha = 0.5
       context.drawImage(tempCanvas, 0, 0, width, height)
       context.restore()
 
-      // Draw outline if in editing mode
       if (isEditing) {
         context.save()
         context.globalAlpha = 1.0
@@ -140,7 +166,6 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
         context.strokeStyle = 'yellow'
         context.lineWidth = 2
 
-        // Find bounds of selected mask
         const pixels = selectedMask.pixels
         if (pixels.length > 0) {
           const minX = pixels.reduce((min, p) => (p.x < min ? p.x : min), Infinity)
@@ -148,7 +173,6 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
           const maxX = pixels.reduce((max, p) => (p.x > max ? p.x : max), -Infinity)
           const maxY = pixels.reduce((max, p) => (p.y > max ? p.y : max), -Infinity)
 
-          // Scale to canvas dimensions
           const scaleX = width / MODEL_WIDTH
           const scaleY = height / MODEL_HEIGHT
 
@@ -171,9 +195,8 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
       context.fillStyle = point.type === 'positive' ? 'green' : 'red'
       context.fill()
     })
-  }, [image, dimensions, masks, selectedMaskId, previewMask, points])
+  }, [image, dimensions, masks, selectedMaskId, previewMask, points, isEditing, updateCanvasSize])
 
-  // Handle mouse movement
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!canvasRef.current || !dimensions) return
@@ -186,7 +209,6 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
       const y = Math.floor(percentY * MODEL_HEIGHT)
 
       if (!isEditing) {
-        // When not in editing, show pointer if over a mask
         const isOverMask = masks.some((mask) => mask.pixels.some((p) => p.x === x && p.y === y))
         canvasRef.current.style.cursor = isOverMask ? 'pointer' : 'crosshair'
       }
@@ -194,17 +216,29 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
     [masks, dimensions, isEditing],
   )
 
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      drawCanvas()
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [drawCanvas])
+
   useEffect(() => {
     drawCanvas()
   }, [drawCanvas])
 
   return (
-    <canvas
-      ref={canvasRef}
-      onClick={onCanvasClick}
-      onMouseMove={handleMouseMove}
-      className="w-full cursor-crosshair"
-    />
+    <div ref={containerRef} className="flex h-full w-full items-center justify-center">
+      <canvas
+        ref={canvasRef}
+        onClick={onCanvasClick}
+        onMouseMove={handleMouseMove}
+        className="max-h-full max-w-full"
+      />
+    </div>
   )
 }
 

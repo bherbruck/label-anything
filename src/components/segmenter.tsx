@@ -50,7 +50,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
 
   const decoderSession = useOnnxSession(decoderUrl)
-
   const { toast } = useToast()
 
   const clearCurrentPoints = () => {
@@ -218,7 +217,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   return (
     <Card
       ref={containerRef}
-      className="relative flex h-full w-full flex-1 items-center justify-center overflow-hidden"
+      className="relative flex h-full w-full flex-1 items-center justify-center overflow-hidden p-4"
     >
       {image ? (
         <>
@@ -253,5 +252,3 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     </Card>
   )
 }
-
-export default Segmenter
