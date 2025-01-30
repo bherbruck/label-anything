@@ -37,8 +37,6 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
 
-  console.log(encoderUrl, decoderUrl)
-
   const encoderSession = useOnnxSession(encoderUrl)
   const decoderSession = useOnnxSession(decoderUrl)
 
