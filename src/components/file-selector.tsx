@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FolderOpen, Circle } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { ScrollArea } from '@radix-ui/react-scroll-area'
 
 export interface FileEntry {
   handle: FileSystemFileHandle
@@ -187,12 +188,6 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
             </>
           )}
         </Button>
-
-        {isProcessingFiles && (
-          <div className="text-muted-foreground px-2 text-xs">
-            Processing: {processedCount}/{totalFiles} files
-          </div>
-        )}
 
         <div ref={parentRef} className="flex-1 overflow-y-auto">
           <div
