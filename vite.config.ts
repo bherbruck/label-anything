@@ -27,5 +27,5 @@ export default defineConfig({
     exclude: ['onnxruntime-web'],
   },
   assetsInclude: ['**/*.onnx', '**/*.wasm'],
-  base: process.env.GITHUB_PAGES ? '/label-anything/' : '/',
+  base: process.env.GITHUB_PAGES ? '/label-anything' : '/',
 })
