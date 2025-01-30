@@ -3,6 +3,16 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FolderOpen, Circle } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export interface FileEntry {
   handle: FileSystemFileHandle
@@ -29,6 +39,9 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
   const [files, setFiles] = useState<(FileEntry | null)[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isProcessingFiles, setIsProcessingFiles] = useState(false)
+
+  // State for AlertDialog visibility
+  const [isUnsupportedDialogOpen, setIsUnsupportedDialogOpen] = useState(false)
 
   const parentRef = useRef<HTMLDivElement>(null)
   const fileEntriesRef = useRef<FileSystemFileHandle[]>([])
@@ -116,6 +129,11 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
   }, [rowVirtualizer.range, isProcessingFiles, files])
 
   const handleSelectDirectory = async () => {
+    if (!window.showDirectoryPicker) {
+      setIsUnsupportedDialogOpen(true)
+      return
+    }
+
     try {
       setIsLoading(true)
       const dirHandle = await window.showDirectoryPicker({
@@ -246,6 +264,52 @@ export const FileSelector: React.FC<FileSelectorProps> = ({
           </div>
         </div>
       </CardContent>
+
+      {/* AlertDialog for unsupported browsers */}
+      <AlertDialog open={isUnsupportedDialogOpen} onOpenChange={setIsUnsupportedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsupported Browser</AlertDialogTitle>
+            <AlertDialogDescription>
+              The folder selection feature is not supported in your current browser. Please use a
+              Chromium-based browser like{' '}
+              <a
+                href="https://www.google.com/chrome/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 underline"
+              >
+                Chrome
+              </a>{' '}
+              or{' '}
+              <a
+                href="https://www.microsoft.com/edge"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 underline"
+              >
+                Edge
+              </a>{' '}
+              to access this functionality.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsUnsupportedDialogOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => window.open('https://www.google.com/chrome/', '_blank')}
+            >
+              Download Chrome
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => window.open('https://www.microsoft.com/edge', '_blank')}
+            >
+              Download Edge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
