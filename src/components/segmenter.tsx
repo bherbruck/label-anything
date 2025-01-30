@@ -6,7 +6,6 @@ import { ImageSize, Mask, MaskPixel, MODEL_WIDTH, MODEL_HEIGHT, Point } from '@/
 import { useOnnxSession } from '@/hooks/use-onnx-session'
 import SegmentationCanvas from './segmentation-canvas'
 import { Loader2 } from 'lucide-react'
-import { clear } from 'console'
 
 interface SegmenterProps {
   file: FileSystemFileHandle | null
