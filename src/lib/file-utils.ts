@@ -1,11 +1,4 @@
-import {
-  Label,
-  Mask,
-  SavedLabelData,
-  SavedMaskData,
-  isSavedLabelData,
-  isSavedMaskData,
-} from './types'
+import { Label, Mask, isSavedLabelData, isSavedMaskData } from './types'
 
 export async function loadLabelsFromDirectory(
   directoryHandle: FileSystemDirectoryHandle,
