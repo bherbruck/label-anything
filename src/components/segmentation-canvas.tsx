@@ -52,14 +52,27 @@ const SegmentationCanvas: React.FC<SegmentationCanvasProps> = ({
     masks: Mask[],
     width: number,
     height: number,
+    outlineThickness: number = 2, // New parameter with default value
   ) => {
     masks.forEach((mask) => {
       const boundaryPixels = getBoundaryPixels(mask.pixels)
       context.fillStyle = 'black' // Outline color
+
+      // Calculate scaling factors
+      const scaleX = width / MODEL_WIDTH
+      const scaleY = height / MODEL_HEIGHT
+
       boundaryPixels.forEach(({ x, y }) => {
         const scaledX = (x / MODEL_WIDTH) * width
         const scaledY = (y / MODEL_HEIGHT) * height
-        context.fillRect(scaledX, scaledY, 1, 1)
+
+        // Draw a rectangle with the specified thickness
+        context.fillRect(
+          scaledX - ((outlineThickness - 1) / 2) * scaleX,
+          scaledY - ((outlineThickness - 1) / 2) * scaleY,
+          outlineThickness * scaleX,
+          outlineThickness * scaleY,
+        )
       })
     })
   }

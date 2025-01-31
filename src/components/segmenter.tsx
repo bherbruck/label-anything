@@ -9,7 +9,7 @@ import { formatError } from '@/lib/utils'
 import SegmentationCanvas from './segmentation-canvas'
 import { Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import * as ortgpu from 'onnxruntime-web/webgpu'
+import * as ort from 'onnxruntime-web/webgpu'
 
 interface SegmenterProps {
   file: FileSystemFileHandle | null
@@ -31,7 +31,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   onMaskSelect,
 }) => {
   const [image, setImage] = useState<ImageBitmap | null>(null)
-  const [imageEmbedding, setImageEmbedding] = useState<ortgpu.Tensor | null>(null)
+  const [imageEmbedding, setImageEmbedding] = useState<ort.Tensor | null>(null)
   const [dimensions, setDimensions] = useState<ImageSize | null>(null)
   const [isGeneratingEmbedding, setIsGeneratingEmbedding] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -48,6 +48,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const [isEditing, setIsEditing] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const previousFileRef = useRef<FileSystemFileHandle | null>(null)
+  const [previousMaskTensor, setPreviousMaskTensor] = useState<ort.Tensor | null>(null)
 
   const decoderSession = useOnnxSession(decoderUrl)
   const { toast } = useToast()
@@ -55,6 +56,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
   const clearCurrentPoints = () => {
     clearPointHistory()
     setPreviewMask(null)
+    setPreviousMaskTensor(null)
   }
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export const Segmenter: React.FC<SegmenterProps> = ({
 
         // Generate embedding
         setIsGeneratingEmbedding(true)
-        const inferenceSession = await ortgpu.InferenceSession.create(encoderUrl, {
+        const inferenceSession = await ort.InferenceSession.create(encoderUrl, {
           executionProviders: ['webgpu'],
         })
         const embedding = await generateImageEmbedding(inferenceSession, fileData)
@@ -146,7 +148,14 @@ export const Segmenter: React.FC<SegmenterProps> = ({
     if (!decoderSession || !imageEmbedding || !dimensions || !image || !file) return
 
     try {
-      const maskPixels = await generateMaskFromPoints(decoderSession, imageEmbedding, points)
+      const { maskTensor, maskPixels } = await generateMaskFromPoints(
+        decoderSession,
+        imageEmbedding,
+        points,
+        previousMaskTensor,
+      )
+
+      setPreviousMaskTensor(maskTensor)
 
       // Update preview mask
       if (maskPixels.length > 0) {
