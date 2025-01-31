@@ -190,9 +190,13 @@ export const Segmenter: React.FC<SegmenterProps> = ({
           })
           clearCurrentPoints()
         }
-      } else if (e.key === 'Escape' && isEditing) {
-        setIsEditing(false)
-        clearCurrentPoints()
+      } else if (e.key === 'Escape') {
+        if (isEditing) {
+          setIsEditing(false)
+          clearCurrentPoints()
+        } else {
+          onMaskSelect(null)
+        }
       } else if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && isEditing) {
         e.preventDefault()
         if (canUndo) {
