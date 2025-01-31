@@ -8,14 +8,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 interface UnsavedChangesDialogProps {
   isOpen: boolean
   onContinue: () => void
   onCancel: () => void
+  onSave: () => void
 }
 
-export function UnsavedChangesDialog({ isOpen, onContinue, onCancel }: UnsavedChangesDialogProps) {
+export function UnsavedChangesDialog({
+  isOpen,
+  onContinue,
+  onCancel,
+  onSave,
+}: UnsavedChangesDialogProps) {
   return (
     <AlertDialog open={isOpen}>
       <AlertDialogContent>
@@ -28,7 +35,10 @@ export function UnsavedChangesDialog({ isOpen, onContinue, onCancel }: UnsavedCh
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onContinue}>Continue</AlertDialogAction>
+          <Button variant="destructive" onClick={onContinue}>
+            Discard and Continue
+          </Button>
+          <AlertDialogAction onClick={onSave}>Save and Continue</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

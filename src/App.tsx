@@ -124,6 +124,16 @@ const App: React.FC = () => {
     pendingFileSelection.current = null
   }
 
+  const handleSaveSwitch = async () => {
+    await handleSaveMasks()
+    setShowUnsavedDialog(false)
+    if (pendingFileSelection.current) {
+      setSelectedFile(pendingFileSelection.current)
+      await loadMasksForFile(pendingFileSelection.current)
+      pendingFileSelection.current = null
+    }
+  }
+
   const handleMaskCreate = (maskWithoutId: Mask) => {
     // Extract all existing mask pixels
     const existingPixels = new Set<string>(
@@ -279,6 +289,7 @@ const App: React.FC = () => {
         isOpen={showUnsavedDialog}
         onContinue={handleConfirmSwitch}
         onCancel={handleCancelSwitch}
+        onSave={handleSaveSwitch}
       />
     </div>
   )
